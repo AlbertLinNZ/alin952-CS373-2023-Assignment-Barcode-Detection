@@ -59,8 +59,14 @@ def createInitializedGreyscalePixelArray(image_width, image_height, initValue = 
 
 
 # You can add your own functions here:
-
-
+def combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height):
+    pixel_array_rgb = []
+    for x in range(image_height):
+        pixel_row_rgb = []
+        for y in range (image_width):
+            pixel_row_rgb.append([px_array_r[x][y], px_array_g[x][y] , px_array_b[x][y]])
+        pixel_array_rgb.append(pixel_row_rgb)
+    return pixel_array_rgb;
 
 
 
@@ -112,7 +118,7 @@ def main():
 
 
     
-    px_array = px_array_r
+    px_array = combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
 
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
