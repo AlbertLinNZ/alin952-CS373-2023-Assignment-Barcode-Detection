@@ -59,15 +59,87 @@ def createInitializedGreyscalePixelArray(image_width, image_height, initValue = 
 
 
 # You can add your own functions here:
-def combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height):
+def combineRGB(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
     pixel_array_rgb = []
     for x in range(image_height):
         pixel_row_rgb = []
         for y in range (image_width):
-            pixel_row_rgb.append([px_array_r[x][y], px_array_g[x][y] , px_array_b[x][y]])
+            pixel_row_rgb.append([pixel_array_r[x][y], pixel_array_g[x][y] , pixel_array_b[x][y]])
         pixel_array_rgb.append(pixel_row_rgb)
     return pixel_array_rgb;
 
+def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
+    greyscale_pixel_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    for i in range(image_width):
+        for j in range(image_height):
+            greyscale_pixel_array[j][i] = int(round(0.299 * pixel_array_r[j][i] + 0.587 * pixel_array_g[j][i] + 0.114 * pixel_array_b[j][i])) 
+    return greyscale_pixel_array
+
+def computeVerticalEdgesSobelAbsolute(pixel_array, image_width, image_height):
+    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    result_array = [[float(0) for pixel in row] for row in result_array]
+    for i in range(1, image_width - 1):
+        for j in range(1, image_height - 1):
+            result_array[j][i] =+ abs(1 / 8 * (pixel_array[j + 1][i + 1] + 
+                                2 * pixel_array[j][i + 1] + pixel_array[j - 1][i + 1] 
+                                - pixel_array[j + 1][i - 1] - 2 * pixel_array[j][i - 1] 
+                                - pixel_array[j - 1][i - 1]))
+    return result_array
+
+def computeHorizontalEdgesSobelAbsolute(pixel_array, image_width, image_height):
+    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    result_array = [[float(0) for pixel in row] for row in result_array]
+    for i in range(1, image_width - 1):
+        for j in range(1, image_height - 1):
+            result_array[j][i] =+ abs(1 / 8 * (pixel_array[j + 1][i + 1] + 
+                                2 * pixel_array[j + 1][i] + pixel_array[j + 1][i - 1] 
+                                - pixel_array[j - 1][i + 1] - 2 * pixel_array[j - 1][i] 
+                                - pixel_array[j - 1][i - 1]))
+    return result_array
+
+def computeStandardDeviationImage5x5(pixel_array, image_width, image_height):
+    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    result_array = [[float(0) for pixel in row] for row in result_array]
+    for i in range(2, image_width - 2):
+        for j in range(2, image_height - 2):
+            slice_5x5 = (pixel_array[j + 2][i-2:i+3] +
+                         pixel_array[j + 1][i-2:i+3] +
+                         pixel_array[j][i-2:i+3] +
+                         pixel_array[j - 1][i-2:i+3] +
+                         pixel_array[j - 2][i-2:i+3] )
+            mean = sum(slice_5x5) / len(slice_5x5)  
+            var  = sum(pow(x-mean,2) for x in slice_5x5) / len(slice_5x5)  
+            std  = math.sqrt(var) 
+            result_array[j][i] += std
+    return result_array
+
+def computeGaussianAveraging3x3RepeatBorder(pixel_array, image_width, image_height):
+    boundary_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    for row in pixel_array:
+        row.insert(0, row[0])
+        row.append(row[len(row) - 1])
+    pixel_array.insert(0, pixel_array[0])
+    pixel_array.insert(len(pixel_array) - 1, pixel_array[len(pixel_array) - 1])
+    for i in range(image_width):
+        for j in range(image_height):
+            gauss_array = (pixel_array[j][i: i + 3] + 
+                            pixel_array[j + 1][i: i + 3] +
+                            pixel_array[j + 2][i: i + 3])
+            for x in range(len(gauss_array)):
+                if x % 2 == 1:
+                    gauss_array[x] *= 2
+            gauss_array[4] *= 4
+            boundary_array[j][i] = sum(gauss_array) / 16
+    return boundary_array
+
+def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
+    for i in range(image_width):
+        for j in range(image_height):
+            if pixel_array[j][i] >= threshold_value:
+                pixel_array[j][i] = 255
+            elif  pixel_array[j][i] < threshold_value:
+                pixel_array[j][i] = 0
+    return pixel_array
 
 
 # This is our code skeleton that performs the barcode detection.
@@ -80,7 +152,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode2"
+    filename = "Barcode1"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -112,13 +184,11 @@ def main():
 
     # STUDENT IMPLEMENTATION here
 
+    px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
+    px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
+    for i in range(4):
+        px_array = computeGaussianAveraging3x3RepeatBorder(px_array, image_width, image_height)
 
-
-
-
-
-    
-    px_array = combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
 
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
@@ -135,7 +205,7 @@ def main():
     axs1[1, 1].imshow(px_array, cmap='gray')
     rect = Rectangle((bbox_min_x, bbox_min_y), bbox_max_x - bbox_min_x, bbox_max_y - bbox_min_y, linewidth=1,
                      edgecolor='g', facecolor='none')
-    axs1[1, 1].add_patch(rect)
+    #axs1[1, 1].add_patch(rect)
 
     # write the output image into output_filename, using the matplotlib savefig method
     extent = axs1[1, 1].get_window_extent().transformed(fig1.dpi_scale_trans.inverted())
