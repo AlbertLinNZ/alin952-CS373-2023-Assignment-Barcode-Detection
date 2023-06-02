@@ -68,34 +68,22 @@ def combineRGB(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_h
         pixel_array_rgb.append(pixel_row_rgb)
     return pixel_array_rgb;
 
+def padZero(pixel_array, image_width, image_height, amount):
+    for row in pixel_array:
+        for i in range(amount):
+            row.insert(0, 0)
+            row.append(0)
+    for i in range(amount):
+        pixel_array.insert(0, [0] * (image_width + amount * 2))
+        pixel_array.append([0] * (image_width + amount * 2))
+    return pixel_array
+
 def computeRGBToGreyscale(pixel_array_r, pixel_array_g, pixel_array_b, image_width, image_height):
     greyscale_pixel_array = createInitializedGreyscalePixelArray(image_width, image_height)
     for i in range(image_width):
         for j in range(image_height):
             greyscale_pixel_array[j][i] = int(round(0.299 * pixel_array_r[j][i] + 0.587 * pixel_array_g[j][i] + 0.114 * pixel_array_b[j][i])) 
     return greyscale_pixel_array
-
-def computeVerticalEdgesSobelAbsolute(pixel_array, image_width, image_height):
-    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
-    result_array = [[float(0) for pixel in row] for row in result_array]
-    for i in range(1, image_width - 1):
-        for j in range(1, image_height - 1):
-            result_array[j][i] =+ abs(1 / 8 * (pixel_array[j + 1][i + 1] + 
-                                2 * pixel_array[j][i + 1] + pixel_array[j - 1][i + 1] 
-                                - pixel_array[j + 1][i - 1] - 2 * pixel_array[j][i - 1] 
-                                - pixel_array[j - 1][i - 1]))
-    return result_array
-
-def computeHorizontalEdgesSobelAbsolute(pixel_array, image_width, image_height):
-    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
-    result_array = [[float(0) for pixel in row] for row in result_array]
-    for i in range(1, image_width - 1):
-        for j in range(1, image_height - 1):
-            result_array[j][i] =+ abs(1 / 8 * (pixel_array[j + 1][i + 1] + 
-                                2 * pixel_array[j + 1][i] + pixel_array[j + 1][i - 1] 
-                                - pixel_array[j - 1][i + 1] - 2 * pixel_array[j - 1][i] 
-                                - pixel_array[j - 1][i - 1]))
-    return result_array
 
 def computeStandardDeviationImage5x5(pixel_array, image_width, image_height):
     result_array = createInitializedGreyscalePixelArray(image_width, image_height)
@@ -140,6 +128,41 @@ def computeThresholdGE(pixel_array, threshold_value, image_width, image_height):
             elif  pixel_array[j][i] < threshold_value:
                 pixel_array[j][i] = 0
     return pixel_array
+
+def computeErosion8Nbh5x5FlatSE(pixel_array, image_width, image_height):
+    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    result_array = [[float(0) for pixel in row] for row in result_array]
+
+    padZero(pixel_array, image_width, image_height, 2)
+    
+    for i in range(image_width):
+        for j in range(image_height):
+            slice_5x5 = (pixel_array[j + 4][i:i + 5] + pixel_array[j + 3][i:i + 5] +
+                        pixel_array[j + 2][i:i + 5] + pixel_array[j + 1][i:i + 5] + 
+                        pixel_array[j][i:i+5])
+            if all(pixel > 0 for pixel in slice_5x5):
+                result_array[j][i] = 1
+            else: 
+                result_array[j][i] = 0
+    return result_array
+
+def computeDilation8Nbh5x5FlatSE(pixel_array, image_width, image_height):
+    result_array = createInitializedGreyscalePixelArray(image_width, image_height)
+    result_array = [[float(0) for pixel in row] for row in result_array]
+
+    padZero(pixel_array, image_width, image_height, 2)
+    
+    for i in range(image_width):
+        for j in range(image_height):
+            slice_5x5 = (pixel_array[j + 4][i:i + 5] + pixel_array[j + 3][i:i + 5] +
+                        pixel_array[j + 2][i:i + 5] + pixel_array[j + 1][i:i + 5] + 
+                        pixel_array[j][i:i+5])
+            if any(pixel > 0 for pixel in slice_5x5):
+                result_array[j][i] = 1
+            else: 
+                result_array[j][i] = 0
+    return result_array
+
 
 
 # This is our code skeleton that performs the barcode detection.
@@ -188,7 +211,11 @@ def main():
     px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
     for i in range(4):
         px_array = computeGaussianAveraging3x3RepeatBorder(px_array, image_width, image_height)
-
+    px_array = computeThresholdGE(px_array, 25, image_width, image_height)
+    for i in range(3):
+        px_array = computeErosion8Nbh5x5FlatSE(px_array, image_width, image_height)
+    for i in range(2):
+        px_array = computeDilation8Nbh5x5FlatSE(px_array, image_width, image_height)
 
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
