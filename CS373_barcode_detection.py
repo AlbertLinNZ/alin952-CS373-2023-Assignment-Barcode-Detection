@@ -163,6 +163,53 @@ def computeDilation8Nbh5x5FlatSE(pixel_array, image_width, image_height):
                 result_array[j][i] = 0
     return result_array
 
+class Queue:
+    def __init__(self):
+        self.items = []
+
+    def isEmpty(self):
+        return self.items == []
+
+    def enqueue(self, item):
+        self.items.insert(0,item)
+
+    def dequeue(self):
+        return self.items.pop()
+
+    def size(self):
+        return len(self.items)
+
+def computeConnectedComponentLabeling(pixel_array, image_width, image_height):
+    label_dict = {}
+    visited = set()
+    current_label = 1
+
+    for j in range(image_height):
+        for i in range(image_width):
+            if (pixel_array[j][i] != 0 and (i, j) not in visited):
+                q = Queue()
+                q.enqueue((i, j))
+                label_dict[current_label] = set()
+                while not q.isEmpty():
+                    curr_i, curr_j = q.dequeue()
+                    visited.add((curr_i, curr_j))
+                    label_dict[current_label].add((curr_i, curr_j))
+                    pixel_array[curr_j][curr_i] = current_label
+                    if (curr_i - 1 >= 0 and pixel_array[curr_j][curr_i - 1] != 0 and (curr_i - 1, curr_j) not in visited):
+                        q.enqueue((curr_i - 1, curr_j))
+                        visited.add((curr_i - 1, curr_j))
+                    if (curr_i + 1 < image_width and pixel_array[curr_j][curr_i + 1] != 0 and (curr_i + 1, curr_j) not in visited):
+                        q.enqueue((curr_i + 1, curr_j))
+                        visited.add((curr_i + 1, curr_j))
+                    if (curr_j - 1 >= 0 and pixel_array[curr_j - 1][curr_i] != 0 and (curr_i, curr_j - 1) not in visited):
+                        q.enqueue((curr_i, curr_j - 1))
+                        visited.add((curr_i, curr_j - 1))
+                    if (curr_j + 1 < image_height and pixel_array[curr_j + 1][curr_i] != 0 and (curr_i, curr_j + 1) not in visited):
+                        q.enqueue((curr_i, curr_j + 1))
+                        visited.add((curr_i, curr_j + 1))
+                current_label += 1
+    return pixel_array, label_dict
+
 
 
 # This is our code skeleton that performs the barcode detection.
@@ -204,35 +251,45 @@ def main():
     axs1[1, 0].set_title('Input blue channel of image')
     axs1[1, 0].imshow(px_array_b, cmap='gray')
 
-
     # STUDENT IMPLEMENTATION here
-
+    rgb_px_array =  combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
     px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
     for i in range(4):
         px_array = computeGaussianAveraging3x3RepeatBorder(px_array, image_width, image_height)
-    px_array = computeThresholdGE(px_array, 25, image_width, image_height)
+    px_array = computeThresholdGE(px_array, 20, image_width, image_height)
     for i in range(3):
         px_array = computeErosion8Nbh5x5FlatSE(px_array, image_width, image_height)
     for i in range(2):
         px_array = computeDilation8Nbh5x5FlatSE(px_array, image_width, image_height)
-
+    px_array, segments = computeConnectedComponentLabeling(px_array, image_width, image_height)
+    largest_segment_size = 0
+    largest_segment_index = 0
+    for key in segments.keys():
+        if len(segments[key]) > largest_segment_size:
+            largest_segment_size = len(segments[key])
+            largest_segment_index = key
+    max_x = max(segments[largest_segment_index], key=lambda item: item[0])[0]
+    max_y = max(segments[largest_segment_index], key=lambda item: item[1])[1]
+    min_x = min(segments[largest_segment_index], key=lambda item: item[0])[0]
+    min_y = min(segments[largest_segment_index], key=lambda item: item[1])[1]
+    
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
     center_x = image_width / 2.0
     center_y = image_height / 2.0
-    bbox_min_x = center_x - image_width / 4.0
-    bbox_max_x = center_x + image_width / 4.0
-    bbox_min_y = center_y - image_height / 4.0
-    bbox_max_y = center_y + image_height / 4.0
+    bbox_min_x = min_x
+    bbox_max_x = max_x
+    bbox_min_y = min_y 
+    bbox_max_y = max_y 
 
     # The following code is used to plot the bounding box and generate an output for marking
     # Draw a bounding box as a rectangle into the input image
     axs1[1, 1].set_title('Final image of detection')
-    axs1[1, 1].imshow(px_array, cmap='gray')
+    axs1[1, 1].imshow(rgb_px_array, cmap='gray')
     rect = Rectangle((bbox_min_x, bbox_min_y), bbox_max_x - bbox_min_x, bbox_max_y - bbox_min_y, linewidth=1,
                      edgecolor='g', facecolor='none')
-    #axs1[1, 1].add_patch(rect)
+    axs1[1, 1].add_patch(rect)
 
     # write the output image into output_filename, using the matplotlib savefig method
     extent = axs1[1, 1].get_window_extent().transformed(fig1.dpi_scale_trans.inverted())
