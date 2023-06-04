@@ -222,7 +222,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode1"
+    filename = "Barcode2"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -255,24 +255,53 @@ def main():
     rgb_px_array =  combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
     px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
-    for i in range(4):
+
+    # did 6 passes to blur it more for images like barcode5 with large gaps
+    for i in range(6):
         px_array = computeGaussianAveraging3x3RepeatBorder(px_array, image_width, image_height)
-    px_array = computeThresholdGE(px_array, 20, image_width, image_height)
-    for i in range(3):
+        
+    px_array = computeThresholdGE(px_array, 15, image_width, image_height)
+
+    # did more errosion and dilation to remove more of the numbers under the barcode (doesn't fully remove it)
+    for i in range(5):
         px_array = computeErosion8Nbh5x5FlatSE(px_array, image_width, image_height)
-    for i in range(2):
+        
+    for i in range(4):
         px_array = computeDilation8Nbh5x5FlatSE(px_array, image_width, image_height)
+        
     px_array, segments = computeConnectedComponentLabeling(px_array, image_width, image_height)
     largest_segment_size = 0
     largest_segment_index = 0
+
+    #checks the segments for its density and ratio and adds the largest key that passes
     for key in segments.keys():
-        if len(segments[key]) > largest_segment_size:
+        max_x = max(segments[key], key=lambda item: item[0])[0] + 0.5
+        max_y = max(segments[key], key=lambda item: item[1])[1] + 0.5
+        min_x = min(segments[key], key=lambda item: item[0])[0] - 0.5
+        min_y = min(segments[key], key=lambda item: item[1])[1] - 0.5
+        width = max_x - min_x
+        height = max_y - min_y
+        num_foreground_pixel = len(segments[key])
+        density = num_foreground_pixel / (width * height)
+        x_ratio = width / height
+        y_ratio = height / width
+        if len(segments[key]) > largest_segment_size and density > 0.5 and x_ratio < 1.8 and y_ratio < 1.8:
             largest_segment_size = len(segments[key])
             largest_segment_index = key
-    max_x = max(segments[largest_segment_index], key=lambda item: item[0])[0]
-    max_y = max(segments[largest_segment_index], key=lambda item: item[1])[1]
-    min_x = min(segments[largest_segment_index], key=lambda item: item[0])[0]
-    min_y = min(segments[largest_segment_index], key=lambda item: item[1])[1]
+
+    max_x = 0
+    max_y = 0
+    min_x = 0
+    min_y = 0
+
+    #if no barcode found then a message is printed out
+    if largest_segment_index != 0:
+        max_x = max(segments[largest_segment_index], key=lambda item: item[0])[0] + 0.5
+        max_y = max(segments[largest_segment_index], key=lambda item: item[1])[1] + 0.5
+        min_x = min(segments[largest_segment_index], key=lambda item: item[0])[0] - 0.5
+        min_y = min(segments[largest_segment_index], key=lambda item: item[1])[1] - 0.5
+    else:
+        print("No barcode found!")
     
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
