@@ -222,7 +222,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode1"
+    filename = "Barcode5"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -243,7 +243,7 @@ def main():
     (image_width, image_height, px_array_r, px_array_g, px_array_b) = readRGBImageToSeparatePixelArrays(input_filename)
 
     # setup the plots for intermediate results in a figure
-    fig1, axs1 = pyplot.subplots(2, 2)
+    fig1, axs1 = pyplot.subplots(4, 3) #change back to 2x2
     axs1[0, 0].set_title('Input red channel of image')
     axs1[0, 0].imshow(px_array_r, cmap='gray')
     axs1[0, 1].set_title('Input green channel of image')
@@ -253,16 +253,19 @@ def main():
 
     # STUDENT IMPLEMENTATION here
     rgb_px_array =  combineRGB(px_array_r, px_array_g, px_array_b, image_width, image_height)
-    px_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
-    px_array = computeStandardDeviationImage5x5(px_array, image_width, image_height)
+    greyscale_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
+    std_array = computeStandardDeviationImage5x5(greyscale_array, image_width, image_height)
+    gauss_array = std_array
+    for i in range(6):
+        gauss_array = computeGaussianAveraging3x3RepeatBorder(gauss_array, image_width, image_height)
+    threshold_array = computeThresholdGE([row[:] for row in gauss_array], 15, image_width, image_height)
+    erosion_array = [row[:] for row in threshold_array]
+    for i in range(5):
+        erosion_array = computeErosion8Nbh5x5FlatSE(erosion_array, image_width, image_height)
+    dilation_array = [row[:] for row in erosion_array]
     for i in range(4):
-        px_array = computeGaussianAveraging3x3RepeatBorder(px_array, image_width, image_height)
-    px_array = computeThresholdGE(px_array, 20, image_width, image_height)
-    for i in range(3):
-        px_array = computeErosion8Nbh5x5FlatSE(px_array, image_width, image_height)
-    for i in range(2):
-        px_array = computeDilation8Nbh5x5FlatSE(px_array, image_width, image_height)
-    px_array, segments = computeConnectedComponentLabeling(px_array, image_width, image_height)
+        dilation_array = computeDilation8Nbh5x5FlatSE(dilation_array, image_width, image_height)
+    segment_array, segments = computeConnectedComponentLabeling([row[:] for row in dilation_array], image_width, image_height)
     largest_segment_size = 0
     largest_segment_index = 0
     for key in segments.keys():
@@ -276,8 +279,6 @@ def main():
     
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
-    center_x = image_width / 2.0
-    center_y = image_height / 2.0
     bbox_min_x = min_x
     bbox_max_x = max_x
     bbox_min_y = min_y 
@@ -290,7 +291,12 @@ def main():
     rect = Rectangle((bbox_min_x, bbox_min_y), bbox_max_x - bbox_min_x, bbox_max_y - bbox_min_y, linewidth=1,
                      edgecolor='g', facecolor='none')
     axs1[1, 1].add_patch(rect)
-
+    axs1[2, 0].imshow(std_array, cmap='gray')
+    axs1[2, 1].imshow(gauss_array, cmap='gray')
+    axs1[2, 2].imshow(threshold_array, cmap='gray')
+    axs1[3, 0].imshow(erosion_array, cmap='gray')
+    axs1[3, 1].imshow(dilation_array, cmap='gray')
+    axs1[3, 2].imshow(segment_array, cmap='gray')
     # write the output image into output_filename, using the matplotlib savefig method
     extent = axs1[1, 1].get_window_extent().transformed(fig1.dpi_scale_trans.inverted())
     pyplot.savefig(output_filename, bbox_inches=extent, dpi=600)
