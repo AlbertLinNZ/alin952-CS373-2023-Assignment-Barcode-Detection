@@ -222,7 +222,7 @@ def main():
     SHOW_DEBUG_FIGURES = True
 
     # this is the default input image filename
-    filename = "Barcode5"
+    filename = "Barcode1"
     input_filename = "images/"+filename+".png"
 
     if command_line_arguments != []:
@@ -256,27 +256,50 @@ def main():
     greyscale_array = computeRGBToGreyscale(px_array_r, px_array_g, px_array_b, image_width, image_height)
     std_array = computeStandardDeviationImage5x5(greyscale_array, image_width, image_height)
     gauss_array = std_array
+    
     for i in range(6):
         gauss_array = computeGaussianAveraging3x3RepeatBorder(gauss_array, image_width, image_height)
     threshold_array = computeThresholdGE([row[:] for row in gauss_array], 15, image_width, image_height)
     erosion_array = [row[:] for row in threshold_array]
+    
     for i in range(5):
         erosion_array = computeErosion8Nbh5x5FlatSE(erosion_array, image_width, image_height)
     dilation_array = [row[:] for row in erosion_array]
+    
     for i in range(4):
         dilation_array = computeDilation8Nbh5x5FlatSE(dilation_array, image_width, image_height)
     segment_array, segments = computeConnectedComponentLabeling([row[:] for row in dilation_array], image_width, image_height)
     largest_segment_size = 0
     largest_segment_index = 0
+    
     for key in segments.keys():
-        if len(segments[key]) > largest_segment_size:
+        max_x = max(segments[key], key=lambda item: item[0])[0] + 0.5
+        max_y = max(segments[key], key=lambda item: item[1])[1] + 0.5
+        min_x = min(segments[key], key=lambda item: item[0])[0] - 0.5
+        min_y = min(segments[key], key=lambda item: item[1])[1] - 0.5
+        width = max_x - min_x
+        height = max_y - min_y
+        num_foreground_pixel = len(segments[key])
+        density = num_foreground_pixel / (width * height)
+        x_ratio = width / height
+        y_ratio = height / width
+        if len(segments[key]) > largest_segment_size and density > 0.5 and x_ratio < 1.8 and y_ratio < 1.8:
             largest_segment_size = len(segments[key])
             largest_segment_index = key
-    max_x = max(segments[largest_segment_index], key=lambda item: item[0])[0]
-    max_y = max(segments[largest_segment_index], key=lambda item: item[1])[1]
-    min_x = min(segments[largest_segment_index], key=lambda item: item[0])[0]
-    min_y = min(segments[largest_segment_index], key=lambda item: item[1])[1]
+
+    max_x = 0
+    max_y = 0
+    min_x = 0
+    min_y = 0
     
+    if largest_segment_index != 0:
+        max_x = max(segments[largest_segment_index], key=lambda item: item[0])[0] + 0.5
+        max_y = max(segments[largest_segment_index], key=lambda item: item[1])[1] + 0.5
+        min_x = min(segments[largest_segment_index], key=lambda item: item[0])[0] - 0.5
+        min_y = min(segments[largest_segment_index], key=lambda item: item[1])[1] - 0.5
+    else:
+        print("No barcode found!")
+        
     # Compute a dummy bounding box centered in the middle of the input image, and with as size of half of width and height
     # Change these values based on the detected barcode region from your algorithm
     bbox_min_x = min_x
@@ -300,7 +323,7 @@ def main():
     # write the output image into output_filename, using the matplotlib savefig method
     extent = axs1[1, 1].get_window_extent().transformed(fig1.dpi_scale_trans.inverted())
     pyplot.savefig(output_filename, bbox_inches=extent, dpi=600)
-
+    
     if SHOW_DEBUG_FIGURES:
         # plot the current figure
         pyplot.show()
