@@ -4,10 +4,12 @@ A Python program that uses concepts of image processing that detects a barcode i
 
 # Demo
 
-Original image
+Original image:
+
 ![](/images/Barcode1.png)
 
-Dectection
+Dectection:
+
 ![](/output_images/Barcode1_output.png)
 
 # Usage
